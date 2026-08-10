@@ -1,0 +1,29 @@
+name: DayEdit
+version: '1.0.0'
+main: com.day.dayedit.DayEdit
+api-version: '1.20'
+author: Bughatti
+description: Plugin para editar items (lore, encantamientos, nombre) via comandos y GUI
+
+commands:
+  dayedit:
+    description: Comando principal de DayEdit
+    usage: /dayedit <lore|name|enchant|gui|reload|help> [args]
+    aliases: [dedit, de, dayedits, edit]
+
+permissions:
+  dayedit.command.lore:
+    description: Permite editar el lore de un item
+    default: op
+  dayedit.command.name:
+    description: Permite renombrar un item
+    default: op
+  dayedit.command.enchant:
+    description: Permite agregar/quitar encantamientos de un item
+    default: op
+  dayedit.command.gui:
+    description: Permite abrir el menu de DayEdit
+    default: op
+  dayedit.command.reload:
+    description: Permite recargar la configuracion del plugin
+    default: op
