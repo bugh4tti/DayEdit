@@ -9,7 +9,7 @@ commands:
   dayedit:
     description: Comando principal de DayEdit
     usage: /dayedit <lore|name|enchant|gui|reload|help> [args]
-    aliases: [dedit, de, dayedits, edit]
+    aliases: [dedit, de, dayedit, edit]
 
 permissions:
   dayedit.command.lore:
