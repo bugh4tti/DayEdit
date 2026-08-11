@@ -1,0 +1,29 @@
+name: Build DayEdit
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Clonar repositorio
+        uses: actions/checkout@v4
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+          cache: maven
+
+      - name: Compilar con Maven
+        run: mvn -B clean package
+
+      - name: Subir el .jar como artefacto
+        uses: actions/upload-artifact@v4
+        with:
+          name: DayEdit
+          path: target/DayEdit.jar
