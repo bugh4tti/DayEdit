@@ -12,7 +12,6 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map;
 
 public class MenuListener implements Listener {
 
@@ -30,8 +29,7 @@ public class MenuListener implements Listener {
         String menuActual = MenuManager.getMenuAbierto(player);
         if (menuActual == null) return;
 
-        String rutaConfig = menuActual;
-        ConfigurationSection seccion = plugin.getConfig().getConfigurationSection(rutaConfig);
+        ConfigurationSection seccion = plugin.getConfig().getConfigurationSection(menuActual);
         if (seccion == null) return;
 
         String tituloEsperado = ItemUtils.colorize(seccion.getString("titulo", ""));
@@ -48,21 +46,16 @@ public class MenuListener implements Listener {
         ItemStack clicked = event.getCurrentItem();
         if (clicked == null || clicked.getType().isAir()) return;
 
-        switch (menuActual) {
-            case "menu-principal":
-                manejarMenuPrincipal(player, seccion, slot);
-                break;
-            case "menu-lores":
-                manejarMenuLores(player, seccion, slot);
-                break;
-            case "menu-tematicas":
-                manejarMenuTematicas(player, seccion, slot);
-                break;
-            default:
-                if (menuActual.startsWith("tematica-")) {
-                    manejarSubmenuTematica(player, seccion, slot, menuActual.substring("tematica-".length()));
-                }
-                break;
+        if (menuActual.equals("menu-principal")) {
+            manejarMenuPrincipal(player, seccion, slot);
+        } else if (menuActual.equals("menu-lores")) {
+            manejarMenuLores(player, seccion, slot);
+        } else if (menuActual.equals("menu-tematicas")) {
+            manejarMenuTematicas(player, seccion, slot);
+        } else if (menuActual.startsWith("tematica-")) {
+            manejarSubmenuTematica(player, seccion, slot, menuActual.substring("tematica-".length()));
+        } else if (menuActual.startsWith("categoria-lore-")) {
+            manejarCategoriaLore(player, seccion, slot, menuActual.substring("categoria-lore-".length()));
         }
     }
 
@@ -91,13 +84,15 @@ public class MenuListener implements Listener {
             return;
         }
 
-        List<Map<?, ?>> lista = seccion.getMapList("lista");
-        for (Map<?, ?> entrada : lista) {
-            int slotEntrada = (int) entrada.get("slot");
-            if (slotEntrada != slot) continue;
+        ConfigurationSection categorias = seccion.getConfigurationSection("categorias");
+        if (categorias == null) return;
 
-            String texto = String.valueOf(entrada.get("texto"));
-            aplicarLoreAItemEnMano(player, texto);
+        for (String clave : categorias.getKeys(false)) {
+            ConfigurationSection categoria = categorias.getConfigurationSection(clave);
+            if (categoria == null) continue;
+            if (categoria.getInt("slot", -1) != slot) continue;
+
+            MenuManager.abrirCategoriaLore(player, clave, 0);
             return;
         }
     }
@@ -143,20 +138,66 @@ public class MenuListener implements Listener {
         }
     }
 
-    private void aplicarLoreAItemEnMano(Player player, String texto) {
+    private void manejarCategoriaLore(Player player, ConfigurationSection seccion, int slot, String claveCategoria) {
+        int anteriorSlot = seccion.getInt("anterior-slot", -1);
+        int volverSlot = seccion.getInt("volver-slot", -1);
+        int siguienteSlot = seccion.getInt("siguiente-slot", -1);
+        int pagina = MenuManager.getPaginaActual(player);
+
+        if (slot == volverSlot) {
+            MenuManager.abrirMenuLores(player);
+            return;
+        }
+        if (slot == anteriorSlot) {
+            if (pagina > 0) {
+                MenuManager.abrirCategoriaLore(player, claveCategoria, pagina - 1);
+            }
+            return;
+        }
+        if (slot == siguienteSlot) {
+            MenuManager.abrirCategoriaLore(player, claveCategoria, pagina + 1);
+            return;
+        }
+
+        int indiceEnGrid = -1;
+        int[] grid = MenuManager.SLOTS_GRID_54;
+        for (int i = 0; i < grid.length; i++) {
+            if (grid[i] == slot) {
+                indiceEnGrid = i;
+                break;
+            }
+        }
+        if (indiceEnGrid == -1) return;
+
+        int minimo = seccion.getInt("minimo", 1);
+        int maximo = seccion.getInt("maximo", 255);
+        int valor = minimo + (pagina * grid.length) + indiceEnGrid;
+        if (valor > maximo) return;
+
+        List<String> plantilla = seccion.getStringList("plantilla");
+        aplicarLoreCategoriaAItemEnMano(player, claveCategoria, valor, plantilla);
+    }
+
+    private void aplicarLoreCategoriaAItemEnMano(Player player, String claveCategoria, int valor, List<String> plantilla) {
         ItemStack item = player.getInventory().getItemInMainHand();
         if (item == null || item.getType().isAir()) {
             player.sendMessage(ItemUtils.colorize(plugin.getMsg("sin-item")));
             return;
         }
 
+        List<String> loreProcesado = new ArrayList<>();
+        for (String linea : plantilla) {
+            loreProcesado.add(ItemUtils.colorize(linea.replace("%valor%", String.valueOf(valor))));
+        }
+
         ItemMeta meta = item.getItemMeta();
-        List<String> lore = meta.hasLore() ? new ArrayList<>(meta.getLore()) : new ArrayList<>();
-        lore.add(ItemUtils.colorize(texto));
-        meta.setLore(lore);
+        meta.setLore(loreProcesado);
         item.setItemMeta(meta);
 
-        player.sendMessage(ItemUtils.colorize(plugin.getMsg("lore-menu-agregado")));
+        String mensaje = plugin.getMsg("categoria-lore-aplicado")
+                .replace("%categoria%", claveCategoria)
+                .replace("%valor%", String.valueOf(valor));
+        player.sendMessage(ItemUtils.colorize(mensaje));
     }
 
     private void aplicarNombreAItemEnMano(Player player, String nombre, String claveVisible) {
@@ -173,4 +214,4 @@ public class MenuListener implements Listener {
         String mensaje = plugin.getMsg("tematica-aplicada").replace("%personaje%", claveVisible);
         player.sendMessage(ItemUtils.colorize(mensaje));
     }
-          }
+                }
