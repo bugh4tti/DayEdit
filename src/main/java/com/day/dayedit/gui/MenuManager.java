@@ -20,14 +20,36 @@ import java.util.UUID;
 public class MenuManager {
 
     private static final Map<UUID, String> menuAbierto = new HashMap<>();
+    private static final Map<UUID, Integer> paginaActual = new HashMap<>();
+    private static final Map<UUID, String> categoriaLoreActual = new HashMap<>();
+
     private static final Material MATERIAL_VOLVER = Material.ARROW;
+    private static final Material MATERIAL_ANTERIOR = Material.SPECTRAL_ARROW;
+    private static final Material MATERIAL_SIGUIENTE = Material.SPECTRAL_ARROW;
+
+    public static final int[] SLOTS_GRID_54 = {
+            10, 11, 12, 13, 14, 15, 16,
+            19, 20, 21, 22, 23, 24, 25,
+            28, 29, 30, 31, 32, 33, 34,
+            37, 38, 39, 40, 41, 42, 43
+    };
 
     public static String getMenuAbierto(Player player) {
         return menuAbierto.get(player.getUniqueId());
     }
 
+    public static int getPaginaActual(Player player) {
+        return paginaActual.getOrDefault(player.getUniqueId(), 0);
+    }
+
+    public static String getCategoriaLoreActual(Player player) {
+        return categoriaLoreActual.get(player.getUniqueId());
+    }
+
     public static void limpiarEstado(Player player) {
         menuAbierto.remove(player.getUniqueId());
+        paginaActual.remove(player.getUniqueId());
+        categoriaLoreActual.remove(player.getUniqueId());
     }
 
     public static void abrirMenuPrincipal(Player player) {
@@ -67,20 +89,84 @@ public class MenuManager {
         int tamano = seccion.getInt("tamano", 27);
         Inventory inv = Bukkit.createInventory(null, tamano, titulo);
 
-        List<Map<?, ?>> lista = seccion.getMapList("lista");
-        for (Map<?, ?> entrada : lista) {
-            int slot = (int) entrada.get("slot");
-            Material material = materialSeguro(String.valueOf(entrada.get("material")));
-            String texto = String.valueOf(entrada.get("texto"));
+        ConfigurationSection categorias = seccion.getConfigurationSection("categorias");
+        if (categorias != null) {
+            for (String clave : categorias.getKeys(false)) {
+                ConfigurationSection categoria = categorias.getConfigurationSection(clave);
+                if (categoria == null) continue;
 
-            ItemStack item = crearItem(material, texto, new ArrayList<>());
-            inv.setItem(slot, item);
+                int slot = categoria.getInt("slot", 0);
+                Material material = materialSeguro(categoria.getString("material", "PAPER"));
+                String nombre = categoria.getString("nombre", clave);
+                List<String> lore = categoria.getStringList("lore");
+
+                inv.setItem(slot, crearItem(material, nombre, lore));
+            }
         }
 
         int volverSlot = seccion.getInt("volver-slot", tamano - 5);
         inv.setItem(volverSlot, crearBotonVolver());
 
         menuAbierto.put(player.getUniqueId(), "menu-lores");
+        player.openInventory(inv);
+    }
+
+    public static void abrirCategoriaLore(Player player, String claveCategoria, int pagina) {
+        DayEdit plugin = DayEdit.getInstance();
+        ConfigurationSection seccion = plugin.getConfig().getConfigurationSection("categoria-lore-" + claveCategoria);
+        if (seccion == null) {
+            player.sendMessage(ItemUtils.colorize("&cEsa categoria de lore no existe en la config."));
+            return;
+        }
+
+        String titulo = ItemUtils.colorize(seccion.getString("titulo", "&#00DAFF&lDayEdit"));
+        int tamano = seccion.getInt("tamano", 54);
+        Material materialRelleno = materialSeguro(seccion.getString("material-relleno", "GRAY_STAINED_GLASS_PANE"));
+        Material materialValor = materialSeguro(seccion.getString("material-valor", "PAPER"));
+        int minimo = seccion.getInt("minimo", 1);
+        int maximo = seccion.getInt("maximo", 255);
+        List<String> plantilla = seccion.getStringList("plantilla");
+
+        int anteriorSlot = seccion.getInt("anterior-slot", -1);
+        int volverSlot = seccion.getInt("volver-slot", -1);
+        int siguienteSlot = seccion.getInt("siguiente-slot", -1);
+
+        Inventory inv = Bukkit.createInventory(null, tamano, titulo);
+
+        rellenarBorde(inv, tamano, materialRelleno, anteriorSlot, volverSlot, siguienteSlot);
+
+        int itemsPorPagina = SLOTS_GRID_54.length;
+        int inicio = minimo + (pagina * itemsPorPagina);
+
+        for (int i = 0; i < SLOTS_GRID_54.length; i++) {
+            int valor = inicio + i;
+            if (valor > maximo) break;
+
+            List<String> loreProcesado = new ArrayList<>();
+            for (String linea : plantilla) {
+                loreProcesado.add(linea.replace("%valor%", String.valueOf(valor)));
+            }
+
+            ItemStack item = crearItem(materialValor, "&b&l" + valor, loreProcesado);
+            inv.setItem(SLOTS_GRID_54[i], item);
+        }
+
+        boolean hayAnterior = pagina > 0;
+        boolean haySiguiente = (inicio + itemsPorPagina) <= maximo;
+
+        if (anteriorSlot >= 0 && hayAnterior) {
+            inv.setItem(anteriorSlot, crearItem(MATERIAL_ANTERIOR, "&e&l« Pagina anterior", new ArrayList<>()));
+        }
+        if (volverSlot >= 0) {
+            inv.setItem(volverSlot, crearBotonVolver());
+        }
+        if (siguienteSlot >= 0 && haySiguiente) {
+            inv.setItem(siguienteSlot, crearItem(MATERIAL_SIGUIENTE, "&e&lPagina siguiente »", new ArrayList<>()));
+        }
+
+        menuAbierto.put(player.getUniqueId(), "categoria-lore-" + claveCategoria);
+        paginaActual.put(player.getUniqueId(), pagina);
+        categoriaLoreActual.put(player.getUniqueId(), claveCategoria);
         player.openInventory(inv);
     }
 
@@ -164,6 +250,30 @@ public class MenuManager {
         player.openInventory(inv);
     }
 
+    private static void rellenarBorde(Inventory inv, int tamano, Material relleno, int... slotsReservados) {
+        int filas = tamano / 9;
+        ItemStack panel = crearItem(relleno, " ", new ArrayList<>());
+
+        for (int slot = 0; slot < tamano; slot++) {
+            int fila = slot / 9;
+            int columna = slot % 9;
+
+            boolean esBorde = fila == 0 || fila == filas - 1 || columna == 0 || columna == 8;
+            if (!esBorde) continue;
+
+            if (esSlotReservado(slot, slotsReservados)) continue;
+
+            inv.setItem(slot, panel);
+        }
+    }
+
+    private static boolean esSlotReservado(int slot, int[] slotsReservados) {
+        for (int reservado : slotsReservados) {
+            if (reservado == slot) return true;
+        }
+        return false;
+    }
+
     private static ItemStack crearItem(Material material, String nombre, List<String> lore) {
         ItemStack item = new ItemStack(material);
         aplicarNombreYLore(item, nombre, lore);
@@ -194,4 +304,4 @@ public class MenuManager {
             return Material.STONE;
         }
     }
-          }
+            }
