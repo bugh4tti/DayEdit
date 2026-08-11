@@ -27,7 +27,9 @@ mensajes:
   lore-menu-agregado: "&aAgregaste esa linea de lore predefinida a tu item."
   tematica-aplicada: "&aLe aplicaste el nombre de &f%personaje% &aa tu item."
   solo-jugadores: "&cEste comando solo puede ser usado por jugadores."
+  categoria-lore-aplicado: "&aLe aplicaste &f%categoria% %valor% &aa tu item."
 
+# Lista de comandos que se muestra en /dayedit help
 ayuda:
   comandos:
     - comando: "/dayedit"
@@ -53,6 +55,9 @@ ayuda:
     - comando: "/dayedit help"
       descripcion: "Muestra esta lista de comandos"
 
+# ============================================================
+#  MENU PRINCIPAL -> se abre con /dayedit
+# ============================================================
 menu-principal:
   titulo: "&#00DAFF&lDayEdit &f- Menu Principal"
   tamano: 27
@@ -74,27 +79,106 @@ menu-principal:
         - "&7tematicas disponibles"
         - "&7para tus items."
 
+# ============================================================
+#  MENU DE LORES -> selector de categoria. Cada categoria abre
+#  su propio menu paginado (definido mas abajo como
+#  categoria-lore-<clave>) con los valores del 1 al 255.
+# ============================================================
 menu-lores:
   titulo: "&#00DAFF&lDayEdit &f- Lores"
   tamano: 27
   volver-slot: 22
-  lista:
-    - slot: 10
-      material: PAPER
-      texto: "&7➤ Objeto Exclusivo"
-    - slot: 11
-      material: PAPER
-      texto: "&c&lVIP &7- Solo para donadores"
-    - slot: 12
-      material: PAPER
-      texto: "&e&l★ Legendario ★"
-    - slot: 13
-      material: PAPER
-      texto: "&b&lEvento Especial"
-    - slot: 14
-      material: PAPER
-      texto: "&8[&7No se puede intercambiar&8]"
+  categorias:
+    afilado:
+      slot: 10
+      material: DIAMOND_SWORD
+      nombre: "&b&lAfilado"
+      lore:
+        - "&7Lores de Sharpness"
+        - "&7del 1 al 255"
+    proteccion:
+      slot: 13
+      material: SHIELD
+      nombre: "&a&lProteccion"
+      lore:
+        - "&7Lores de Protection"
+        - "&7del 1 al 255"
+    atributos:
+      slot: 16
+      material: NETHER_STAR
+      nombre: "&d&lAtributos"
+      lore:
+        - "&7Lores de atributos"
+        - "&7del 1 al 255"
 
+# ============================================================
+#  MENUS PAGINADOS DE CADA CATEGORIA DE LORE
+#  - material-relleno: item usado para decorar los bordes
+#  - material-valor: item usado para cada numero del 1 al 255
+#  - plantilla: el lore completo que se le pondra al item,
+#    %valor% se reemplaza por el numero elegido (reemplaza
+#    TODO el lore actual del item, no lo agrega al final)
+#  - anterior-slot / siguiente-slot / volver-slot: botones
+#    de navegacion (van en la fila de abajo, el borde)
+# ============================================================
+categoria-lore-afilado:
+  titulo: "&#00DAFF&lDayEdit &f- Afilado"
+  tamano: 54
+  material-relleno: GRAY_STAINED_GLASS_PANE
+  material-valor: ENCHANTED_BOOK
+  minimo: 1
+  maximo: 255
+  anterior-slot: 48
+  volver-slot: 49
+  siguiente-slot: 50
+  plantilla:
+    - "&8Armamento"
+    - " "
+    - "&8| &7Encantamientos:"
+    - "&8 &8 &8• &fSharpness %valor%"
+    - " "
+    - "&9Irrompible"
+
+categoria-lore-proteccion:
+  titulo: "&#00DAFF&lDayEdit &f- Proteccion"
+  tamano: 54
+  material-relleno: GRAY_STAINED_GLASS_PANE
+  material-valor: ENCHANTED_BOOK
+  minimo: 1
+  maximo: 255
+  anterior-slot: 48
+  volver-slot: 49
+  siguiente-slot: 50
+  plantilla:
+    - "&8Armadura"
+    - " "
+    - "&8| &7Encantamientos:"
+    - "&8 &8 &8• &fProtection %valor%"
+    - " "
+    - "&9Irrompible"
+
+categoria-lore-atributos:
+  titulo: "&#00DAFF&lDayEdit &f- Atributos"
+  tamano: 54
+  material-relleno: GRAY_STAINED_GLASS_PANE
+  material-valor: NETHER_STAR
+  minimo: 1
+  maximo: 255
+  anterior-slot: 48
+  volver-slot: 49
+  siguiente-slot: 50
+  plantilla:
+    - "&8Atributos"
+    - " "
+    - "&8| &7Bonus:"
+    - "&8 &8 &8• &f+%valor% de Daño"
+    - " "
+    - "&9Irrompible"
+
+# ============================================================
+#  MENU DE TEMATICAS -> cada entrada abre su propio submenu
+#  de personajes (definido mas abajo como tematica-<clave>)
+# ============================================================
 menu-tematicas:
   titulo: "&#00DAFF&lDayEdit &f- Tematicas"
   tamano: 27
@@ -110,6 +194,14 @@ menu-tematicas:
         - "&7Tematica de Brawl Stars"
         - "&7Click para elegir tu Brawler"
 
+# ============================================================
+#  SUBMENU: tematica-brawlstars
+#  Cada personaje: al hacer click, si tienes un item en la
+#  mano, le pone ese nombre (con degradado hex) al item.
+#  El campo "textura" acepta un base64 de cabeza custom
+#  (ej. de minecraft-heads.com); "jugador" acepta un nombre
+#  de jugador real como alternativa. Todo editable aqui.
+# ============================================================
 tematica-brawlstars:
   titulo: "&#00DAFF&lBrawlBox &f- Elige tu Brawler"
   tamano: 54
