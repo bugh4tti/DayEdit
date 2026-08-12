@@ -8,8 +8,8 @@ description: Plugin para editar items (lore, encantamientos, nombre) via comando
 commands:
   dayedit:
     description: Comando principal de DayEdit
-    usage: /dayedit <lore|name|enchant|gui|reload|help> [args]
-    aliases: [dedit, de, dayedit, edit]
+    usage: /dayedit <lore|name|enchant|setlore|settematica|gui|reload|help> [args]
+    aliases: [dedit, de, edit]
 
 permissions:
   dayedit.command.lore:
@@ -26,4 +26,10 @@ permissions:
     default: op
   dayedit.command.reload:
     description: Permite recargar la configuracion del plugin
+    default: op
+  dayedit.command.setlore:
+    description: Permite aplicar un lore de categoria por comando (sin abrir el menu)
+    default: op
+  dayedit.command.settematica:
+    description: Permite aplicar el nombre de un personaje por comando (sin abrir el menu)
     default: op
