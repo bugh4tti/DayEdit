@@ -12,6 +12,7 @@ import org.bukkit.inventory.meta.ItemMeta;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 
 public class MenuListener implements Listener {
 
@@ -28,6 +29,28 @@ public class MenuListener implements Listener {
 
         String menuActual = MenuManager.getMenuAbierto(player);
         if (menuActual == null) return;
+
+        if (menuActual.startsWith("campo-lore-")) {
+            String claveCategoria = menuActual.substring("campo-lore-".length());
+            ConfigurationSection seccionCategoria = plugin.getConfig().getConfigurationSection("categoria-lore-" + claveCategoria);
+            if (seccionCategoria == null) return;
+
+            String tituloBase = ItemUtils.colorize(seccionCategoria.getString("titulo", ""));
+            if (!event.getView().getTitle().startsWith(tituloBase)) return;
+
+            event.setCancelled(true);
+
+            if (event.getClickedInventory() == null
+                    || !event.getClickedInventory().equals(event.getView().getTopInventory())) {
+                return;
+            }
+
+            ItemStack clickedCampo = event.getCurrentItem();
+            if (clickedCampo == null || clickedCampo.getType().isAir()) return;
+
+            manejarCampoLore(player, claveCategoria, seccionCategoria, event.getSlot());
+            return;
+        }
 
         ConfigurationSection seccion = plugin.getConfig().getConfigurationSection(menuActual);
         if (seccion == null) return;
@@ -92,7 +115,14 @@ public class MenuListener implements Listener {
             if (categoria == null) continue;
             if (categoria.getInt("slot", -1) != slot) continue;
 
-            MenuManager.abrirCategoriaLore(player, clave, 0);
+            ConfigurationSection categoriaLoreSeccion = plugin.getConfig().getConfigurationSection("categoria-lore-" + clave);
+            boolean tieneCampos = categoriaLoreSeccion != null && categoriaLoreSeccion.getConfigurationSection("campos") != null;
+
+            if (tieneCampos) {
+                MenuManager.abrirCategoriaLoreCampos(player, clave);
+            } else {
+                MenuManager.abrirCategoriaLore(player, clave, 0);
+            }
             return;
         }
     }
@@ -132,7 +162,7 @@ public class MenuListener implements Listener {
             if (personaje == null) continue;
             if (personaje.getInt("slot", -1) != slot) continue;
 
-            String nombre = personaje.getString("nombre", clave);
+            String nombre = com.day.dayedit.utils.TematicaNombres.getNombre(claveTematica, clave, clave);
             aplicarNombreAItemEnMano(player, nombre, clave);
             return;
         }
@@ -159,23 +189,108 @@ public class MenuListener implements Listener {
             return;
         }
 
-        int indiceEnGrid = -1;
-        int[] grid = MenuManager.SLOTS_GRID_54;
-        for (int i = 0; i < grid.length; i++) {
-            if (grid[i] == slot) {
-                indiceEnGrid = i;
-                break;
-            }
-        }
+        int indiceEnGrid = MenuManager.indiceEnGrid(slot);
         if (indiceEnGrid == -1) return;
 
         int minimo = seccion.getInt("minimo", 1);
         int maximo = seccion.getInt("maximo", 255);
-        int valor = minimo + (pagina * grid.length) + indiceEnGrid;
+        int valor = minimo + (pagina * MenuManager.SLOTS_GRID_54.length) + indiceEnGrid;
         if (valor > maximo) return;
 
         List<String> plantilla = seccion.getStringList("plantilla");
         aplicarLoreCategoriaAItemEnMano(player, claveCategoria, valor, plantilla);
+    }
+
+    private void manejarCampoLore(Player player, String claveCategoria, ConfigurationSection seccionCategoria, int slot) {
+        int anteriorSlot = seccionCategoria.getInt("anterior-slot", -1);
+        int volverSlot = seccionCategoria.getInt("volver-slot", -1);
+        int siguienteSlot = seccionCategoria.getInt("siguiente-slot", -1);
+        int pagina = MenuManager.getPaginaActual(player);
+        int indiceCampo = MenuManager.getIndiceCampoActual(player);
+
+        List<String> orden = MenuManager.getOrdenCampos(player);
+        if (orden == null || indiceCampo >= orden.size()) return;
+
+        if (slot == volverSlot) {
+            if (indiceCampo > 0) {
+                MenuManager.abrirCampoLore(player, claveCategoria, indiceCampo - 1, 0);
+            } else {
+                MenuManager.limpiarEstadoCampos(player);
+                MenuManager.abrirMenuLores(player);
+            }
+            return;
+        }
+        if (slot == anteriorSlot) {
+            if (pagina > 0) {
+                MenuManager.abrirCampoLore(player, claveCategoria, indiceCampo, pagina - 1);
+            }
+            return;
+        }
+        if (slot == siguienteSlot) {
+            MenuManager.abrirCampoLore(player, claveCategoria, indiceCampo, pagina + 1);
+            return;
+        }
+
+        int indiceEnGrid = MenuManager.indiceEnGrid(slot);
+        if (indiceEnGrid == -1) return;
+
+        String campoKey = orden.get(indiceCampo);
+        ConfigurationSection campos = seccionCategoria.getConfigurationSection("campos");
+        if (campos == null) return;
+        ConfigurationSection campo = campos.getConfigurationSection(campoKey);
+        if (campo == null) return;
+
+        double minimo = campo.getDouble("minimo", 0);
+        double maximo = campo.getDouble("maximo", 100);
+        double paso = campo.getDouble("paso", 1);
+        int decimales = campo.getInt("decimales", 0);
+
+        int indiceValor = (pagina * MenuManager.SLOTS_GRID_54.length) + indiceEnGrid;
+        int totalValores = MenuManager.totalValores(minimo, maximo, paso);
+        if (indiceValor >= totalValores) return;
+
+        double valor = MenuManager.calcularValor(minimo, paso, indiceValor);
+        String valorTexto = MenuManager.formatearValor(valor, decimales);
+
+        MenuManager.guardarSeleccionCampo(player, campoKey, valorTexto);
+
+        if (indiceCampo + 1 < orden.size()) {
+            MenuManager.abrirCampoLore(player, claveCategoria, indiceCampo + 1, 0);
+        } else {
+            finalizarCategoriaConCampos(player, claveCategoria, seccionCategoria);
+        }
+    }
+
+    private void finalizarCategoriaConCampos(Player player, String claveCategoria, ConfigurationSection seccionCategoria) {
+        Map<String, String> seleccion = MenuManager.getSeleccionCampos(player);
+        MenuManager.limpiarEstadoCampos(player);
+
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item == null || item.getType().isAir()) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("sin-item")));
+            MenuManager.abrirMenuLores(player);
+            return;
+        }
+
+        List<String> plantilla = seccionCategoria.getStringList("plantilla");
+        List<String> loreProcesado = new ArrayList<>();
+        for (String linea : plantilla) {
+            String procesada = linea;
+            for (Map.Entry<String, String> entry : seleccion.entrySet()) {
+                procesada = procesada.replace("%" + entry.getKey() + "%", entry.getValue());
+            }
+            loreProcesado.add(ItemUtils.colorize(procesada));
+        }
+
+        ItemMeta meta = item.getItemMeta();
+        meta.setLore(loreProcesado);
+        item.setItemMeta(meta);
+
+        String mensaje = plugin.getMsg("categoria-lore-personalizado-aplicado")
+                .replace("%categoria%", claveCategoria);
+        player.sendMessage(ItemUtils.colorize(mensaje));
+
+        MenuManager.abrirMenuLores(player);
     }
 
     private void aplicarLoreCategoriaAItemEnMano(Player player, String claveCategoria, int valor, List<String> plantilla) {
@@ -214,4 +329,4 @@ public class MenuListener implements Listener {
         String mensaje = plugin.getMsg("tematica-aplicada").replace("%personaje%", claveVisible);
         player.sendMessage(ItemUtils.colorize(mensaje));
     }
-                }
+    }
