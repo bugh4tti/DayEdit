@@ -3,11 +3,13 @@ package com.day.dayedit.commands;
 import com.day.dayedit.DayEdit;
 import com.day.dayedit.gui.MenuManager;
 import com.day.dayedit.utils.ItemUtils;
+import com.day.dayedit.utils.TematicaNombres;
 import org.bukkit.NamespacedKey;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
+import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -53,6 +55,12 @@ public class DayEditCommand implements CommandExecutor, TabCompleter {
                 break;
             case "enchant":
                 handleEnchant(player, args);
+                break;
+            case "setlore":
+                handleSetLore(player, args);
+                break;
+            case "settematica":
+                handleSetTematica(player, args);
                 break;
             case "gui":
                 MenuManager.abrirMenuPrincipal(player);
@@ -264,6 +272,124 @@ public class DayEditCommand implements CommandExecutor, TabCompleter {
         }
     }
 
+    private void handleSetLore(Player player, String[] args) {
+        if (!player.hasPermission("dayedit.command.lore")) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("sin-permiso")));
+            return;
+        }
+
+        if (args.length < 3) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("uso-setlore")));
+            return;
+        }
+
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item == null || item.getType().isAir()) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("sin-item")));
+            return;
+        }
+
+        String claveCategoria = args[1].toLowerCase(Locale.ROOT);
+        ConfigurationSection seccion = plugin.getConfig().getConfigurationSection("categoria-lore-" + claveCategoria);
+        if (seccion == null) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("categoria-invalida")));
+            return;
+        }
+
+        ConfigurationSection campos = seccion.getConfigurationSection("campos");
+        List<String> plantilla = seccion.getStringList("plantilla");
+
+        if (campos != null) {
+            List<String> orden = new ArrayList<>(campos.getKeys(false));
+            String[] valores = Arrays.copyOfRange(args, 2, args.length);
+
+            if (valores.length != orden.size()) {
+                player.sendMessage(ItemUtils.colorize("&cEsta categoria necesita " + orden.size()
+                        + " valor(es) en este orden: " + String.join(", ", orden)));
+                return;
+            }
+
+            List<String> loreProcesado = new ArrayList<>();
+            for (String linea : plantilla) {
+                String procesada = linea;
+                for (int i = 0; i < orden.size(); i++) {
+                    procesada = procesada.replace("%" + orden.get(i) + "%", valores[i]);
+                }
+                loreProcesado.add(ItemUtils.colorize(procesada));
+            }
+
+            ItemMeta meta = item.getItemMeta();
+            meta.setLore(loreProcesado);
+            item.setItemMeta(meta);
+
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("categoria-lore-personalizado-aplicado")
+                    .replace("%categoria%", claveCategoria)));
+            return;
+        }
+
+        int minimo = seccion.getInt("minimo", 1);
+        int maximo = seccion.getInt("maximo", 255);
+        int valor;
+        try {
+            valor = Integer.parseInt(args[2]);
+        } catch (NumberFormatException e) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("valor-fuera-de-rango")));
+            return;
+        }
+        if (valor < minimo || valor > maximo) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("valor-fuera-de-rango")));
+            return;
+        }
+
+        List<String> loreProcesado = new ArrayList<>();
+        for (String linea : plantilla) {
+            loreProcesado.add(ItemUtils.colorize(linea.replace("%valor%", String.valueOf(valor))));
+        }
+
+        ItemMeta meta = item.getItemMeta();
+        meta.setLore(loreProcesado);
+        item.setItemMeta(meta);
+
+        player.sendMessage(ItemUtils.colorize(plugin.getMsg("categoria-lore-aplicado")
+                .replace("%categoria%", claveCategoria)
+                .replace("%valor%", String.valueOf(valor))));
+    }
+
+    private void handleSetTematica(Player player, String[] args) {
+        if (!player.hasPermission("dayedit.command.name")) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("sin-permiso")));
+            return;
+        }
+
+        if (args.length < 3) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("uso-settematica")));
+            return;
+        }
+
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item == null || item.getType().isAir()) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("sin-item")));
+            return;
+        }
+
+        String claveTematica = args[1].toLowerCase(Locale.ROOT);
+        String clavePersonaje = args[2].toLowerCase(Locale.ROOT);
+
+        ConfigurationSection seccion = plugin.getConfig().getConfigurationSection("tematica-" + claveTematica);
+        if (seccion == null || seccion.getConfigurationSection("personajes." + clavePersonaje) == null) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("tematica-invalida")));
+            return;
+        }
+
+        String nombre = TematicaNombres.getNombre(claveTematica, clavePersonaje, clavePersonaje);
+
+        ItemMeta meta = item.getItemMeta();
+        meta.setDisplayName(ItemUtils.colorize(nombre));
+        item.setItemMeta(meta);
+
+        player.sendMessage(ItemUtils.colorize(plugin.getMsg("tematica-aplicada").replace("%personaje%", clavePersonaje)));
+    }
+
     private Enchantment buscarEncantamiento(String nombre) {
         String clave = nombre.toLowerCase(Locale.ROOT).replace(" ", "_");
         Enchantment enchant = Enchantment.getByKey(NamespacedKey.minecraft(clave));
@@ -302,18 +428,37 @@ public class DayEditCommand implements CommandExecutor, TabCompleter {
         List<String> opciones = new ArrayList<>();
 
         if (args.length == 1) {
-            opciones.addAll(Arrays.asList("lore", "name", "enchant", "gui", "reload", "help"));
+            opciones.addAll(Arrays.asList("lore", "name", "enchant", "setlore", "settematica", "gui", "reload", "help"));
         } else if (args.length == 2) {
             if (args[0].equalsIgnoreCase("lore")) {
                 opciones.addAll(Arrays.asList("add", "remove", "clear", "set"));
             } else if (args[0].equalsIgnoreCase("enchant")) {
                 opciones.addAll(Arrays.asList("add", "remove", "clear"));
+            } else if (args[0].equalsIgnoreCase("setlore")) {
+                ConfigurationSection raiz = plugin.getConfig();
+                for (String clave : raiz.getKeys(false)) {
+                    if (clave.startsWith("categoria-lore-")) {
+                        opciones.add(clave.substring("categoria-lore-".length()));
+                    }
+                }
+            } else if (args[0].equalsIgnoreCase("settematica")) {
+                ConfigurationSection raiz = plugin.getConfig();
+                for (String clave : raiz.getKeys(false)) {
+                    if (clave.startsWith("tematica-")) {
+                        opciones.add(clave.substring("tematica-".length()));
+                    }
+                }
             }
         } else if (args.length == 3 && args[0].equalsIgnoreCase("enchant")
                 && (args[1].equalsIgnoreCase("add") || args[1].equalsIgnoreCase("remove"))) {
             opciones.addAll(Arrays.stream(Enchantment.values())
                     .map(e -> e.getKey().getKey())
                     .collect(Collectors.toList()));
+        } else if (args.length == 3 && args[0].equalsIgnoreCase("settematica")) {
+            ConfigurationSection seccion = plugin.getConfig().getConfigurationSection("tematica-" + args[1].toLowerCase(Locale.ROOT) + ".personajes");
+            if (seccion != null) {
+                opciones.addAll(seccion.getKeys(false));
+            }
         }
 
         String ultimo = args[args.length - 1].toLowerCase(Locale.ROOT);
@@ -321,4 +466,4 @@ public class DayEditCommand implements CommandExecutor, TabCompleter {
                 .filter(o -> o.toLowerCase(Locale.ROOT).startsWith(ultimo))
                 .collect(Collectors.toList());
     }
-    }
+                                                                    }
