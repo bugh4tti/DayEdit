@@ -1,7 +1,13 @@
 # ============================================================
 #  DayEdit - Configuracion
 #  Todo lo que ves aqui es editable: mensajes, menus, lores
-#  predefinidos y tematicas. No necesitas tocar el codigo.
+#  predefinidos y tematicas.
+#
+#  OJO: los nombres (hex/degradados) de los personajes de cada
+#  tematica YA NO se editan aqui. Se editan en el codigo, en
+#  TematicaNombres.java (se sube un commit a GitHub y listo).
+#  Aca solo se configura el slot, material, textura/jugador de
+#  la cabeza y la navegacion del menu.
 # ============================================================
 
 author: "SoyBughatti"
@@ -28,6 +34,12 @@ mensajes:
   tematica-aplicada: "&aLe aplicaste el nombre de &f%personaje% &aa tu item."
   solo-jugadores: "&cEste comando solo puede ser usado por jugadores."
   categoria-lore-aplicado: "&aLe aplicaste &f%categoria% %valor% &aa tu item."
+  categoria-lore-personalizado-aplicado: "&aLe aplicaste el lore de &f%categoria% &apersonalizado a tu item."
+  categoria-invalida: "&cEsa categoria de lore no existe."
+  tematica-invalida: "&cEsa tematica o personaje no existe."
+  uso-setlore: "&cUso: /dayedit setlore <categoria> <valor(es)>"
+  uso-settematica: "&cUso: /dayedit settematica <tematica> <personaje>"
+  valor-fuera-de-rango: "&cEse valor esta fuera de rango."
 
 # Lista de comandos que se muestra en /dayedit help
 ayuda:
@@ -50,6 +62,10 @@ ayuda:
       descripcion: "Quita un encantamiento especifico del item"
     - comando: "/dayedit enchant clear"
       descripcion: "Quita todos los encantamientos del item"
+    - comando: "/dayedit setlore <categoria> <valor(es)>"
+      descripcion: "Aplica un lore de categoria sin abrir el menu (ej: /de setlore afilado 255)"
+    - comando: "/dayedit settematica <tematica> <personaje>"
+      descripcion: "Aplica el nombre de un personaje sin abrir el menu (ej: /de settematica brawlstars shelly)"
     - comando: "/dayedit reload"
       descripcion: "Recarga la configuracion del plugin"
     - comando: "/dayedit help"
@@ -60,10 +76,11 @@ ayuda:
 # ============================================================
 menu-principal:
   titulo: "&#00DAFF&lDayEdit &f- Menu Principal"
-  tamano: 27
+  tamano: 54
+  material-relleno: GRAY_STAINED_GLASS_PANE
   items:
     lores:
-      slot: 11
+      slot: 29
       material: PAPER
       nombre: "&a&lMenu de Lores"
       lore:
@@ -71,7 +88,7 @@ menu-principal:
         - "&7predefinidos y aplicarlos"
         - "&7al item en tu mano."
     tematicas:
-      slot: 15
+      slot: 33
       material: NETHER_STAR
       nombre: "&d&lMenu de Tematicas"
       lore:
@@ -82,39 +99,40 @@ menu-principal:
 # ============================================================
 #  MENU DE LORES -> selector de categoria. Cada categoria abre
 #  su propio menu paginado (definido mas abajo como
-#  categoria-lore-<clave>) con los valores del 1 al 255.
+#  categoria-lore-<clave>) con los valores correspondientes.
 # ============================================================
 menu-lores:
   titulo: "&#00DAFF&lDayEdit &f- Lores"
-  tamano: 27
-  volver-slot: 22
+  tamano: 54
+  material-relleno: GRAY_STAINED_GLASS_PANE
+  volver-slot: 49
   categorias:
     afilado:
-      slot: 10
+      slot: 29
       material: DIAMOND_SWORD
       nombre: "&b&lAfilado"
       lore:
         - "&7Lores de Sharpness"
         - "&7del 1 al 255"
     proteccion:
-      slot: 13
+      slot: 31
       material: SHIELD
       nombre: "&a&lProteccion"
       lore:
         - "&7Lores de Protection"
         - "&7del 1 al 255"
     atributos:
-      slot: 16
+      slot: 33
       material: NETHER_STAR
       nombre: "&d&lAtributos"
       lore:
-        - "&7Lores de atributos"
-        - "&7del 1 al 255"
+        - "&7Lore con Protection +"
+        - "&7Vida, Velocidad y Daño"
 
 # ============================================================
-#  MENUS PAGINADOS DE CADA CATEGORIA DE LORE
+#  CATEGORIAS SIMPLES (un solo valor, placeholder %valor%)
 #  - material-relleno: item usado para decorar los bordes
-#  - material-valor: item usado para cada numero del 1 al 255
+#  - material-valor: item usado para cada numero
 #  - plantilla: el lore completo que se le pondra al item,
 #    %valor% se reemplaza por el numero elegido (reemplaza
 #    TODO el lore actual del item, no lo agrega al final)
@@ -150,30 +168,66 @@ categoria-lore-proteccion:
   volver-slot: 49
   siguiente-slot: 50
   plantilla:
-    - "&8Armadura"
+    - "&8Equipamiento"
     - " "
     - "&8| &7Encantamientos:"
     - "&8 &8 &8• &fProtection %valor%"
     - " "
     - "&9Irrompible"
 
+# ============================================================
+#  CATEGORIA CON CAMPOS MULTIPLES (varios valores en un mismo
+#  lore). El jugador va eligiendo un valor por campo, en el
+#  orden en que estan escritos aqui, y al final se arma el
+#  lore completo reemplazando %clave-del-campo% por lo elegido.
+#  - minimo / maximo / paso: rango y salto de cada campo
+#  - decimales: cuantos decimales mostrar (0 = numero entero)
+# ============================================================
 categoria-lore-atributos:
   titulo: "&#00DAFF&lDayEdit &f- Atributos"
   tamano: 54
   material-relleno: GRAY_STAINED_GLASS_PANE
   material-valor: NETHER_STAR
-  minimo: 1
-  maximo: 255
   anterior-slot: 48
   volver-slot: 49
   siguiente-slot: 50
   plantilla:
-    - "&8Atributos"
+    - "&8Equipamiento"
     - " "
-    - "&8| &7Bonus:"
-    - "&8 &8 &8• &f+%valor% de Daño"
+    - "&8| &7Encantamientos:"
+    - "&8 &8 &8• &fProtection %protection%"
+    - " "
+    - "&8| &7Atributos:"
+    - "&8 &8 &8• &cVida (+%vida%) ❤"
+    - "&8 &8 &8• &bVelo (+%velo%) ☄"
+    - "&8 &8 &8● &4Daño (+%dano%) 🗡"
     - " "
     - "&9Irrompible"
+  campos:
+    protection:
+      nombre: "&fProtection"
+      minimo: 1
+      maximo: 255
+      paso: 1
+      decimales: 0
+    vida:
+      nombre: "&cVida"
+      minimo: 0.5
+      maximo: 100
+      paso: 0.5
+      decimales: 1
+    velo:
+      nombre: "&bVelo"
+      minimo: 0.01
+      maximo: 0.02
+      paso: 0.01
+      decimales: 2
+    dano:
+      nombre: "&4Daño"
+      minimo: 0.1
+      maximo: 20
+      paso: 0.1
+      decimales: 1
 
 # ============================================================
 #  MENU DE TEMATICAS -> cada entrada abre su propio submenu
@@ -181,11 +235,12 @@ categoria-lore-atributos:
 # ============================================================
 menu-tematicas:
   titulo: "&#00DAFF&lDayEdit &f- Tematicas"
-  tamano: 27
-  volver-slot: 22
+  tamano: 54
+  material-relleno: GRAY_STAINED_GLASS_PANE
+  volver-slot: 49
   lista:
     brawlstars:
-      slot: 13
+      slot: 31
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
@@ -197,14 +252,15 @@ menu-tematicas:
 # ============================================================
 #  SUBMENU: tematica-brawlstars
 #  Cada personaje: al hacer click, si tienes un item en la
-#  mano, le pone ese nombre (con degradado hex) al item.
-#  El campo "textura" acepta un base64 de cabeza custom
-#  (ej. de minecraft-heads.com); "jugador" acepta un nombre
-#  de jugador real como alternativa. Todo editable aqui.
+#  mano, le pone su nombre (con degradado hex, definido en
+#  TematicaNombres.java) al item. El campo "textura" acepta un
+#  base64 de cabeza custom (ej. de minecraft-heads.com);
+#  "jugador" acepta un nombre de jugador real como alternativa.
 # ============================================================
 tematica-brawlstars:
   titulo: "&#00DAFF&lBrawlBox &f- Elige tu Brawler"
   tamano: 54
+  material-relleno: GRAY_STAINED_GLASS_PANE
   volver-slot: 49
   personajes:
     shelly:
@@ -212,58 +268,48 @@ tematica-brawlstars:
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
-      nombre: "&x&F&F&8&C&2&C&lS&x&F&F&9&2&3&8&lH&x&F&F&9&8&4&3&lE&x&F&F&9&F&4&F&lL&x&F&F&A&5&5&A&lL&x&F&F&A&B&6&6&lY"
     colt:
       slot: 11
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
-      nombre: "&x&F&F&D&9&3&D&lC&x&F&F&B&F&3&1&lO&x&F&F&A&6&2&6&lL&x&F&F&8&C&1&A&lT"
     bull:
       slot: 12
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
-      nombre: "&x&8&B&4&5&1&3&lB&x&A&3&5&1&1&7&lU&x&B&A&5&D&1&A&lL&x&D&2&6&9&1&E&lL"
     el_primo:
       slot: 13
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
-      nombre: "&x&F&F&D&7&0&0&lE&x&F&2&B&9&0&6&lL&x&E&5&9&B&0&B&lP&x&D&8&7&C&1&1&lR&x&C&C&5&E&1&7&lI&x&B&F&4&0&1&C&lM&x&B&2&2&2&2&2&lO"
     poco:
       slot: 14
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
-      nombre: "&x&2&E&C&C&7&1&lP&x&2&5&A&6&5&C&lO&x&1&D&8&0&4&7&lC&x&1&4&5&A&3&2&lO"
     rico:
       slot: 15
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
-      nombre: "&x&0&0&E&5&F&F&lR&x&0&0&B&B&E&E&lI&x&0&0&9&0&D&D&lC&x&0&0&6&6&C&C&lO"
     spike:
       slot: 16
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
-      nombre: "&x&7&C&F&C&0&0&lS&x&6&4&D&C&0&7&lP&x&4&C&B&B&0&E&lI&x&3&3&9&A&1&4&lK&x&1&B&7&A&1&B&lE"
     crow:
       slot: 19
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
-      nombre: "&x&9&B&3&0&F&F&lC&x&8&0&2&0&D&5&lR&x&6&6&1&0&A&C&lO&x&4&B&0&0&8&2&lW"
     leon:
       slot: 20
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
-      nombre: "&x&3&9&F&F&1&4&lL&x&2&F&C&C&1&6&lE&x&2&4&9&9&1&8&lO&x&1&A&6&6&1&A&lN"
     mortis:
       slot: 21
       material: PLAYER_HEAD
       textura: ""
       jugador: ""
-      nombre: "&x&8&A&2&B&E&2&lM&x&7&8&2&4&C&6&lO&x&6&5&1&D&A&9&lR&x&5&3&1&6&8&D&lT&x&4&0&0&F&7&0&lI&x&2&E&0&8&5&4&lS"
