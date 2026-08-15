@@ -2,9 +2,12 @@ package com.day.dayedit.commands;
 
 import com.day.dayedit.DayEdit;
 import com.day.dayedit.gui.MenuManager;
+import com.day.dayedit.utils.AttributeUtils;
 import com.day.dayedit.utils.ItemUtils;
 import com.day.dayedit.utils.TematicaNombres;
 import org.bukkit.NamespacedKey;
+import org.bukkit.attribute.Attribute;
+import org.bukkit.attribute.AttributeModifier;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -12,6 +15,7 @@ import org.bukkit.command.TabCompleter;
 import org.bukkit.configuration.ConfigurationSection;
 import org.bukkit.enchantments.Enchantment;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.EquipmentSlot;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 
@@ -61,6 +65,12 @@ public class DayEditCommand implements CommandExecutor, TabCompleter {
                 break;
             case "settematica":
                 handleSetTematica(player, args);
+                break;
+            case "attribute":
+                handleAttribute(player, args);
+                break;
+            case "swordcps":
+                handleSwordCps(player, args);
                 break;
             case "gui":
                 MenuManager.abrirMenuPrincipal(player);
@@ -390,6 +400,174 @@ public class DayEditCommand implements CommandExecutor, TabCompleter {
         player.sendMessage(ItemUtils.colorize(plugin.getMsg("tematica-aplicada").replace("%personaje%", clavePersonaje)));
     }
 
+    private void handleAttribute(Player player, String[] args) {
+        if (!player.hasPermission("dayedit.command.attribute")) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("sin-permiso")));
+            return;
+        }
+
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item == null || item.getType().isAir()) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("sin-item")));
+            return;
+        }
+
+        if (args.length < 2) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("uso-attribute")));
+            return;
+        }
+
+        String accion = args[1].toLowerCase(Locale.ROOT);
+
+        switch (accion) {
+            case "set": {
+                if (args.length < 4) {
+                    player.sendMessage(ItemUtils.colorize(plugin.getMsg("uso-attribute")));
+                    return;
+                }
+                Attribute atributo = AttributeUtils.buscarAtributo(args[2]);
+                if (atributo == null) {
+                    player.sendMessage(ItemUtils.colorize(plugin.getMsg("attribute-invalido").replace("%atributo%", args[2])));
+                    return;
+                }
+                double cantidad;
+                try {
+                    cantidad = Double.parseDouble(args[3]);
+                } catch (NumberFormatException e) {
+                    player.sendMessage(ItemUtils.colorize(plugin.getMsg("valor-fuera-de-rango")));
+                    return;
+                }
+                AttributeModifier.Operation operacion = AttributeModifier.Operation.ADD_NUMBER;
+                if (args.length >= 5) {
+                    AttributeModifier.Operation encontrada = AttributeUtils.buscarOperacion(args[4]);
+                    if (encontrada == null) {
+                        player.sendMessage(ItemUtils.colorize(plugin.getMsg("operacion-invalida").replace("%operacion%", args[4])));
+                        return;
+                    }
+                    operacion = encontrada;
+                }
+                EquipmentSlot slot = EquipmentSlot.HAND;
+                if (args.length >= 6) {
+                    EquipmentSlot encontrado = AttributeUtils.buscarSlot(args[5]);
+                    if (encontrado == null) {
+                        player.sendMessage(ItemUtils.colorize(plugin.getMsg("slot-invalido").replace("%slot%", args[5])));
+                        return;
+                    }
+                    slot = encontrado;
+                }
+
+                AttributeUtils.aplicarModificador(item, atributo, slot, operacion, cantidad);
+                player.sendMessage(ItemUtils.colorize(plugin.getMsg("atributo-modificado")
+                        .replace("%atributo%", atributo.name())
+                        .replace("%valor%", String.valueOf(cantidad))
+                        .replace("%slot%", slot.name())));
+                break;
+            }
+            case "remove": {
+                if (args.length < 3) {
+                    player.sendMessage(ItemUtils.colorize(plugin.getMsg("uso-attribute")));
+                    return;
+                }
+                Attribute atributo = AttributeUtils.buscarAtributo(args[2]);
+                if (atributo == null) {
+                    player.sendMessage(ItemUtils.colorize(plugin.getMsg("attribute-invalido").replace("%atributo%", args[2])));
+                    return;
+                }
+                EquipmentSlot slot = EquipmentSlot.HAND;
+                if (args.length >= 4) {
+                    EquipmentSlot encontrado = AttributeUtils.buscarSlot(args[3]);
+                    if (encontrado == null) {
+                        player.sendMessage(ItemUtils.colorize(plugin.getMsg("slot-invalido").replace("%slot%", args[3])));
+                        return;
+                    }
+                    slot = encontrado;
+                }
+                boolean quitado = AttributeUtils.quitarModificador(item, atributo, slot);
+                if (quitado) {
+                    player.sendMessage(ItemUtils.colorize(plugin.getMsg("atributo-quitado")
+                            .replace("%atributo%", atributo.name())
+                            .replace("%slot%", slot.name())));
+                } else {
+                    player.sendMessage(ItemUtils.colorize(plugin.getMsg("atributo-no-tenia")));
+                }
+                break;
+            }
+            case "clear": {
+                AttributeUtils.limpiarModificadores(item);
+                player.sendMessage(ItemUtils.colorize(plugin.getMsg("atributos-limpiados")));
+                break;
+            }
+            case "list": {
+                List<String> lineas = AttributeUtils.listarModificadores(item);
+                if (lineas.isEmpty()) {
+                    player.sendMessage(ItemUtils.colorize(plugin.getMsg("atributos-lista-vacia")));
+                    return;
+                }
+                player.sendMessage(ItemUtils.colorize("&#00DAFF&lDayEdit &f- Atributos del item:"));
+                for (String linea : lineas) {
+                    player.sendMessage(ItemUtils.colorize(linea));
+                }
+                break;
+            }
+            default:
+                player.sendMessage(ItemUtils.colorize(plugin.getMsg("uso-attribute")));
+                break;
+        }
+    }
+
+    private void handleSwordCps(Player player, String[] args) {
+        if (!player.hasPermission("dayedit.command.swordcps")) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("sin-permiso")));
+            return;
+        }
+
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item == null || item.getType().isAir()) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("sin-item")));
+            return;
+        }
+
+        if (args.length < 2) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("uso-swordcps")));
+            return;
+        }
+
+        String accion = args[1].toLowerCase(Locale.ROOT);
+
+        if (accion.equals("remove")) {
+            boolean quitado = AttributeUtils.quitarModificador(item, Attribute.GENERIC_ATTACK_SPEED, EquipmentSlot.HAND);
+            if (quitado) {
+                player.sendMessage(ItemUtils.colorize(plugin.getMsg("swordcps-quitado")));
+            } else {
+                player.sendMessage(ItemUtils.colorize(plugin.getMsg("atributo-no-tenia")));
+            }
+            return;
+        }
+
+        if (!accion.equals("set") || args.length < 3) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("uso-swordcps")));
+            return;
+        }
+
+        int valor;
+        try {
+            valor = Integer.parseInt(args[2]);
+        } catch (NumberFormatException e) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("swordcps-fuera-de-rango")));
+            return;
+        }
+        if (valor < 1 || valor > 30) {
+            player.sendMessage(ItemUtils.colorize(plugin.getMsg("swordcps-fuera-de-rango")));
+            return;
+        }
+
+        double cantidad = valor - 4.0;
+        AttributeUtils.aplicarModificador(item, Attribute.GENERIC_ATTACK_SPEED, EquipmentSlot.HAND,
+                AttributeModifier.Operation.ADD_NUMBER, cantidad);
+
+        player.sendMessage(ItemUtils.colorize(plugin.getMsg("swordcps-aplicado").replace("%valor%", String.valueOf(valor))));
+    }
+
     private Enchantment buscarEncantamiento(String nombre) {
         String clave = nombre.toLowerCase(Locale.ROOT).replace(" ", "_");
         Enchantment enchant = Enchantment.getByKey(NamespacedKey.minecraft(clave));
@@ -428,37 +606,54 @@ public class DayEditCommand implements CommandExecutor, TabCompleter {
         List<String> opciones = new ArrayList<>();
 
         if (args.length == 1) {
-            opciones.addAll(Arrays.asList("lore", "name", "enchant", "setlore", "settematica", "gui", "reload", "help"));
+            opciones.addAll(Arrays.asList("lore", "name", "enchant", "setlore", "settematica",
+                    "attribute", "swordcps", "gui", "reload", "help"));
         } else if (args.length == 2) {
             if (args[0].equalsIgnoreCase("lore")) {
                 opciones.addAll(Arrays.asList("add", "remove", "clear", "set"));
             } else if (args[0].equalsIgnoreCase("enchant")) {
                 opciones.addAll(Arrays.asList("add", "remove", "clear"));
             } else if (args[0].equalsIgnoreCase("setlore")) {
-                ConfigurationSection raiz = plugin.getConfig();
-                for (String clave : raiz.getKeys(false)) {
+                for (String clave : plugin.getConfig().getKeys(false)) {
                     if (clave.startsWith("categoria-lore-")) {
                         opciones.add(clave.substring("categoria-lore-".length()));
                     }
                 }
             } else if (args[0].equalsIgnoreCase("settematica")) {
-                ConfigurationSection raiz = plugin.getConfig();
-                for (String clave : raiz.getKeys(false)) {
+                for (String clave : plugin.getConfig().getKeys(false)) {
                     if (clave.startsWith("tematica-")) {
                         opciones.add(clave.substring("tematica-".length()));
                     }
                 }
+            } else if (args[0].equalsIgnoreCase("attribute")) {
+                opciones.addAll(Arrays.asList("set", "remove", "clear", "list"));
+            } else if (args[0].equalsIgnoreCase("swordcps")) {
+                opciones.addAll(Arrays.asList("set", "remove"));
             }
-        } else if (args.length == 3 && args[0].equalsIgnoreCase("enchant")
-                && (args[1].equalsIgnoreCase("add") || args[1].equalsIgnoreCase("remove"))) {
-            opciones.addAll(Arrays.stream(Enchantment.values())
-                    .map(e -> e.getKey().getKey())
-                    .collect(Collectors.toList()));
-        } else if (args.length == 3 && args[0].equalsIgnoreCase("settematica")) {
-            ConfigurationSection seccion = plugin.getConfig().getConfigurationSection("tematica-" + args[1].toLowerCase(Locale.ROOT) + ".personajes");
-            if (seccion != null) {
-                opciones.addAll(seccion.getKeys(false));
+        } else if (args.length == 3) {
+            if (args[0].equalsIgnoreCase("enchant")
+                    && (args[1].equalsIgnoreCase("add") || args[1].equalsIgnoreCase("remove"))) {
+                opciones.addAll(Arrays.stream(Enchantment.values())
+                        .map(e -> e.getKey().getKey())
+                        .collect(Collectors.toList()));
+            } else if (args[0].equalsIgnoreCase("settematica")) {
+                ConfigurationSection seccion = plugin.getConfig()
+                        .getConfigurationSection("tematica-" + args[1].toLowerCase(Locale.ROOT) + ".personajes");
+                if (seccion != null) {
+                    opciones.addAll(seccion.getKeys(false));
+                }
+            } else if (args[0].equalsIgnoreCase("attribute")
+                    && (args[1].equalsIgnoreCase("set") || args[1].equalsIgnoreCase("remove"))) {
+                opciones.addAll(Arrays.stream(Attribute.values())
+                        .map(Enum::name)
+                        .collect(Collectors.toList()));
             }
+        } else if (args.length == 4 && args[0].equalsIgnoreCase("attribute") && args[1].equalsIgnoreCase("remove")) {
+            opciones.addAll(Arrays.asList("mainhand", "offhand", "head", "chest", "legs", "feet"));
+        } else if (args.length == 5 && args[0].equalsIgnoreCase("attribute") && args[1].equalsIgnoreCase("set")) {
+            opciones.addAll(Arrays.asList("add", "add_scalar", "multiply"));
+        } else if (args.length == 6 && args[0].equalsIgnoreCase("attribute") && args[1].equalsIgnoreCase("set")) {
+            opciones.addAll(Arrays.asList("mainhand", "offhand", "head", "chest", "legs", "feet"));
         }
 
         String ultimo = args[args.length - 1].toLowerCase(Locale.ROOT);
@@ -466,4 +661,4 @@ public class DayEditCommand implements CommandExecutor, TabCompleter {
                 .filter(o -> o.toLowerCase(Locale.ROOT).startsWith(ultimo))
                 .collect(Collectors.toList());
     }
-                                                                    }
+        }
